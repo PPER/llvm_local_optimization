@@ -1,0 +1,11 @@
+int compute (int a)
+{
+	int result;
+  result = a + 0;
+  return result;
+  result += a;
+  result -= b;
+  result *= c;
+  result /= 2;
+  return result;
+}
