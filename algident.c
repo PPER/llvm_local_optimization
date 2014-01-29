@@ -1,6 +1,7 @@
 int compute (int a)
 {
 	int result;
-  result = a + 0;
+	int b = 0;
+  result = a + b;
   return result;
 }

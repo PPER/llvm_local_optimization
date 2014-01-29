@@ -76,13 +76,15 @@ namespace {
 										li->replaceAllUsesWith(value);
 										++ii;
 										//we need to add counter to marker......
-										ops->algbraicIdent++;
+										//ops->algbraicIdent++;
 										instchanged = true;	funcchanged = true;
+										errs() << "flag***666" << "\n";
 										continue;
 									}
 								}
 							}
 						} else if (op == Instruction::Add) {
+							errs() << "flag3" << "\n";
 							if (ConstantInt *LC = dyn_cast<ConstantInt>(L)) {
 								if (LC->getValue() == zero) {
 									//How to replace and delete the instruction?
@@ -114,10 +116,22 @@ namespace {
 								}
 							}
 						} else if (op == Instruction::Sub) {
-							if (ConstantInt *RC = dyn_cast<ConstantInt>(R)) {
+							//dyn_cast<Instruction>(L);
+							
+							//if ((dyn_cast<Instruction>(L))->isIdenticalTo(dyn_cast<Instruction>(R))) {
+							if (L == R) {
+								errs() << "flag4" << "\n";
+								ii->replaceAllUsesWith(ConstantInt::get(L->getContext(), zero));
+								BasicBlock::iterator tmp = ii;
+								++ii;
+								tmp->eraseFromParent();
+								ops->algbraicIdent++;
+								instchanged = true; funcchanged = true;
+								continue;
+							} else if (ConstantInt *RC = dyn_cast<ConstantInt>(R)) {
 								if (RC->getValue() == zero) {
 									ii->replaceAllUsesWith(L);
-									BasicBlock::iterator tmp == ii;
+									BasicBlock::iterator tmp = ii;
 									++ii;
 									tmp->eraseFromParent();
 									ops->algbraicIdent++;
@@ -125,22 +139,26 @@ namespace {
 									continue;
 								}
 								//change the following cast into dyn_cast???
-							} else if (cast<Instruction>(L)->isIdenticalTo(cast<Instruction>(R))) {
-								ii->replaceAllUsesWith(zero);
+							} /*else if (cast<Instruction>(L)->isIdenticalTo(cast<Instruction>(R))) {
+								errs() << "flag4" << "\n";
+								ii->replaceAllUsesWith(ConstantInt::get(L->getContext(), zero));
 
-								BasicBlock::iterator tmp == ii;
+								BasicBlock::iterator tmp = ii;
 								++ii;
 								tmp->eraseFromParent();
 								ops->algbraicIdent++;
 								instchanged = true; funcchanged = true;
 								continue;
+							} else {
+								errs() << "flag5" << "\n";
 							}
+							*/
 
 						} else if (op == Instruction::Mul) {
 							if (ConstantInt *LC = dyn_cast<ConstantInt>(L)) {
 								if (LC->getValue() == zero) {
-									ii->replaceAllUsesWith(zero);
-									BasicBlock::iterator tmp == ii;
+									ii->replaceAllUsesWith(ConstantInt::get(LC->getContext(), zero));
+									BasicBlock::iterator tmp = ii;
 									++ii;
 									tmp->eraseFromParent();
 									ops->algbraicIdent++;
@@ -148,7 +166,7 @@ namespace {
 									continue;
 								} else if (LC->getValue() == one) {
 									ii->replaceAllUsesWith(R);
-									BasicBlock::iterator tmp == ii;
+									BasicBlock::iterator tmp = ii;
 									++ii;
 									tmp->eraseFromParent();
 									ops->algbraicIdent++;
@@ -157,8 +175,8 @@ namespace {
 								}
 							} else if (ConstantInt *RC = dyn_cast<ConstantInt>(R)) {
 								if (RC->getValue() == zero) {
-									ii->replaceAllUsesWith(zero);
-									BasicBlock::iterator tmp == ii;
+									ii->replaceAllUsesWith(ConstantInt::get(RC->getContext(), zero));
+									BasicBlock::iterator tmp = ii;
 									++ii;
 									tmp->eraseFromParent();
 									ops->algbraicIdent++;
@@ -166,7 +184,7 @@ namespace {
 									continue;
 								} else if (RC->getValue() == one) {
 									ii->replaceAllUsesWith(L);
-									BasicBlock::iterator tmp == ii;
+									BasicBlock::iterator tmp = ii;
 									++ii;
 									tmp->eraseFromParent();
 									ops->algbraicIdent++;
@@ -177,10 +195,15 @@ namespace {
 						} else if (op == Instruction::UDiv || op == Instruction::SDiv) {
 							//.............we need to judge whether R is 0.....
 							//if R is a variable, can we just add a assert R != 0??????????????????????
-							//............................asert..............................
-							if (cast<Instruction>(L)->isIdenticalTo(cast<Instruction>(R))) {
-								ii->replaceAllUsesWith(one);
-								BasicBlock::iterator tmp == ii;
+							//............................assert..............................
+							
+							//if (dyn_cast<Instruction>(L)->isIdenticalTo(dyn_cast<Instruction>(R))) {
+							//...........
+							if (L == R) {//...........and L != 0
+							//if (dyn_cast<Instruction>(L)->isIdenticalTo(dyn_cast<Instruction>(R))) {
+							//L is not a const........if (cast<ConstantInt>(L)->isIdenticalTo(cast<ConstantInt>(R))) {
+								ii->replaceAllUsesWith(ConstantInt::get(L->getContext(), one));
+								BasicBlock::iterator tmp = ii;
 								++ii;
 								tmp->eraseFromParent();
 								ops->algbraicIdent++;
@@ -188,8 +211,8 @@ namespace {
 								continue;
 							} else if (ConstantInt *LC = dyn_cast<ConstantInt>(L)) {
 								if (LC->getValue() == zero) {
-									ii->replaceAllUsesWith(zero);
-									BasicBlock::iterator tmp == ii;
+									ii->replaceAllUsesWith(ConstantInt::get(LC->getContext(), zero));
+									BasicBlock::iterator tmp = ii;
 									++ii;
 									tmp->eraseFromParent();
 									ops->algbraicIdent++;
@@ -199,7 +222,7 @@ namespace {
 							} else if (ConstantInt *RC = dyn_cast<ConstantInt>(R)) {
 								if (RC->getValue() == one) {
 									ii->replaceAllUsesWith(L);
-									BasicBlock::iterator tmp == ii;
+									BasicBlock::iterator tmp = ii;
 									++ii;
 									tmp->eraseFromParent();
 									ops->algbraicIdent++;
@@ -212,12 +235,12 @@ namespace {
 						}
 
 						if (ii->getNumOperands() == 2 && isa<Constant>(L) && isa<Constant>(R)) {
-							Value *result = calcOpRes(unsigned op, ConstantInt *L, ConstantInt *R);
-							ii->replaceAllUsersWith(result);
-							BasicBlock::iterator tmp == ii;
+							Value *result = calcOpRes(op, cast<ConstantInt>(L), cast<ConstantInt>(R));
+							ii->replaceAllUsesWith(result);
+							BasicBlock::iterator tmp = ii;
 							++ii;
 							tmp->eraseFromParent();
-							ops->constFold++;
+							ops->constantFold++;
 							instchanged = true; funcchanged = true;
 							continue;
 						}
@@ -226,14 +249,14 @@ namespace {
 						if (op == Instruction::Mul) {
 							if (ConstantInt *LC = dyn_cast<ConstantInt>(L)) {
 								APInt mulval = LC->getValue();
-								if (mulval.isPowerof2()) {
+								if (mulval.isPowerOf2()) {
 									unsigned lshift = mulval.logBase2();
-									BinaryOperator newInst = BinaryOperator::Create(Instruction::Shl, R, ConstantInt::get(L->getType(), lshift));// isSigned is set to false
+									BinaryOperator *newInst = BinaryOperator::Create(Instruction::Shl, R, ConstantInt::get(L->getType(), lshift));// isSigned is set to false
 									//ii->getParent()->getInstList().insertafter(ii, newInst);
 									//insert before ii
 									ii->getParent()->getInstList().insert(ii, newInst);
-									ii->replaceAllUsersWith(newInst);
-									BasicBlock::iterator tmp == ii;
+									ii->replaceAllUsesWith(newInst);
+									BasicBlock::iterator tmp = ii;
 									++ii;
 									//delete the original ii
 									tmp->eraseFromParent();
@@ -243,14 +266,14 @@ namespace {
 								} 
 							} else if (ConstantInt *RC = dyn_cast<ConstantInt>(R)) {
 								APInt mulval = RC->getValue();
-								if (mulval.isPowerof2()) {
+								if (mulval.isPowerOf2()) {
 									unsigned lshift = mulval.logBase2();
-									BinaryOperator newInst = BinaryOperator::Create(Instruction::Shl, L, ConstantInt::get(R->getType(), lshift));// isSigned is set to false
+									BinaryOperator *newInst = BinaryOperator::Create(Instruction::Shl, L, ConstantInt::get(R->getType(), lshift));// isSigned is set to false
 									//ii->getParent()->getInstList().insertafter(ii, newInst);
 									//insert before ii
 									ii->getParent()->getInstList().insert(ii, newInst);
-									ii->replaceAllUsersWith(newInst);
-									BasicBlock::iterator tmp == ii;
+									ii->replaceAllUsesWith(newInst);
+									BasicBlock::iterator tmp = ii;
 									++ii;
 									//delete the original ii
 									tmp->eraseFromParent();
@@ -262,9 +285,9 @@ namespace {
 						} else if (op == Instruction::SDiv || op == Instruction::UDiv) {
 							if (ConstantInt *LC = dyn_cast<ConstantInt>(L)) {
 								APInt divval = LC->getValue();
-								if (divval.isPowerof2()) {
-									unsigned rshift = mulval.logBase2();
-									BinaryOperator newInst;
+								if (divval.isPowerOf2()) {
+									unsigned rshift = divval.logBase2();
+									BinaryOperator *newInst;
 									if (op == Instruction::SDiv) {
 										newInst = BinaryOperator::Create(Instruction::AShr, R, ConstantInt::get(L->getType(), rshift));// isSigned is set to false
 									} else {
@@ -273,8 +296,8 @@ namespace {
 									//ii->getParent()->getInstList().insertafter(ii, newInst);
 									//insert before ii
 									ii->getParent()->getInstList().insert(ii, newInst);
-									ii->replaceAllUsersWith(newInst);
-									BasicBlock::iterator tmp == ii;
+									ii->replaceAllUsesWith(newInst);
+									BasicBlock::iterator tmp = ii;
 									++ii;
 									//delete the original ii
 									tmp->eraseFromParent();
@@ -284,9 +307,9 @@ namespace {
 								} 
 							} else if (ConstantInt *RC = dyn_cast<ConstantInt>(R)) {
 								APInt divval = RC->getValue();
-								if (divval.isPowerof2()) {
+								if (divval.isPowerOf2()) {
 									unsigned rshift = divval.logBase2();
-									BinaryOperator newInst;
+									BinaryOperator *newInst;
 									if (op == Instruction::SDiv) {
 										newInst = BinaryOperator::Create(Instruction::AShr, L, ConstantInt::get(R->getType(), rshift));// isSigned is set to false
 									} else {
@@ -295,8 +318,8 @@ namespace {
 									//ii->getParent()->getInstList().insertafter(ii, newInst);
 									//insert before ii
 									ii->getParent()->getInstList().insert(ii, newInst);
-									ii->replaceAllUsersWith(newInst);
-									BasicBlock::iterator tmp == ii;
+									ii->replaceAllUsesWith(newInst);
+									BasicBlock::iterator tmp = ii;
 									++ii;
 									//delete the original ii
 									tmp->eraseFromParent();
@@ -326,20 +349,19 @@ namespace {
 				return funcchanged;
 			}
 				
-				
 			ConstantInt *calcOpRes(unsigned op, ConstantInt *L, ConstantInt *R) {
 				if (op == Instruction::Add) {
-					return ConstantInt::get(left->getContext(), left->getValue() + right->getValue());
-					//return ConstantInt::get(cast<IntegerType>(ii->getType()), left->getValue() + right->getValue());
-					return ConstantInt::get(ii->getType(), left->getValue() + right->getValue());
+					return ConstantInt::get(L->getContext(), L->getValue() + R->getValue());
+					//return ConstantInt::get(cast<IntegerType>(ii->getType()), L->getValue() + R->getValue());
+					//return cast<ConstantInt>(ConstantInt::get(L->getType(), L->getValue() + R->getValue()));
 				} else if (op == Instruction::Sub) {
-					return ConstantInt::get(left->getContext(), left->getValue() - right->getValue());
+					return ConstantInt::get(L->getContext(), L->getValue() - R->getValue());
 				} else if (op == Instruction::Mul) {
-					return ConstantInt::get(left->getContext(), left->getValue() * right->getValue());
+					return ConstantInt::get(L->getContext(), L->getValue() * R->getValue());
 				} else if (op == Instruction::UDiv) {
-					return ConstantInt::get(left->getContext(), left->getValue().udiv(right->getValue()));
+					return ConstantInt::get(L->getContext(), L->getValue().udiv(R->getValue()));
 				} else if (op == Instruction::SDiv) {
-					return Constantint::get(left->getContext(), left->getValue().sdiv(right->getValue()));
+					return ConstantInt::get(L->getContext(), L->getValue().sdiv(R->getValue()));
 				} else {
 					errs() << "error....";
 				}
