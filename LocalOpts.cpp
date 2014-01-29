@@ -40,7 +40,6 @@ namespace {
 				OptSummary *ops = new OptSummary();
 				bool funcchanged = false;
 
-
 				for (Function::iterator BB = F.begin(), Be = F.end(); BB != Be; ++BB) {
 					//for (BasicBlock::iterator ii = BB->begin(), ie = BB->end(); ii != ie; ++ii) {
 					BasicBlock::iterator ii = BB->begin(), ie = BB->end();

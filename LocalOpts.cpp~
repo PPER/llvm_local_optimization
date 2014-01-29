@@ -78,6 +78,7 @@ namespace {
 										//we need to add counter to marker......
 										//ops->algbraicIdent++;
 										instchanged = true;	funcchanged = true;
+										errs() << "flag***666" << "\n";
 										continue;
 									}
 								}
