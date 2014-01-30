@@ -351,6 +351,10 @@ namespace {
 			ConstantInt *calcOpRes(unsigned op, ConstantInt *L, ConstantInt *R) {
 				if (op == Instruction::Add) {
 					return ConstantInt::get(L->getContext(), L->getValue() + R->getValue());
+
+
+
+					//return ConstantExpr::getAdd(cast<ConstantInt>(I->getOperand(0)), cast<ConstantInt>(I->getOperand(1)));
 					//return ConstantInt::get(cast<IntegerType>(ii->getType()), L->getValue() + R->getValue());
 					//return cast<ConstantInt>(ConstantInt::get(L->getType(), L->getValue() + R->getValue()));
 				} else if (op == Instruction::Sub) {
