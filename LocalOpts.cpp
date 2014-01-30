@@ -70,24 +70,30 @@ namespace {
 
 
 
-
-						//errs() << "flag 1" << "\n";
-
-						//while () {
-
-						//need to handle with store, because register too many cases
-						//
-						//
-
-
-
-
 						if (op == Instruction::SExt) {
+							Value *S = ii->getOperand(0);
+							if (ConstantInt *SC = dyn_cast<ConstantInt>(S)) {
+								//Constant -> Value
+								Value *conv = ConstantInt::get(ii->getType(), SC->getSExtValue());//, false);
+								replaceAndErase(conv, ii);
+								//ops->constantFold++;
+								instchanged = true; funcchanged = true;
+								continue;
+							}
+						} else if (op == Instruction::Trunc) {
+							Value *S = ii->getOperand(0);
+							if (ConstantInt *SC = dyn_cast<ConstantInt>(S)) {
+								//Value *conv = ConstantInt::get(ii->getType(), SC->getValue());
+								Value *conv = ConstantInt::get(ii->getType(), SC->getSExtValue());
+								replaceAndErase(conv, ii);
+								//ops->constantFold++;
+								instchanged = true; funcchanged = true;
+								continue;
+							}
+						}
 
-
-
-						} else if (op == Instruction::Add) {
-							errs() << "flag3" << "\n";
+						
+						if (op == Instruction::Add) {
 							if (ConstantInt *LC = dyn_cast<ConstantInt>(L)) {
 								if (LC->getValue() == zero) {
 									replaceAndErase(R, ii);
@@ -206,12 +212,17 @@ namespace {
 
 							//Constant Folding
 							if (op == Instruction::Add || op == Instruction::Sub || op == Instruction::Mul || op == Instruction::SDiv || op == Instruction::UDiv) {
-								if (ii->getNumOperands() == 2 && isa<Constant>(L) && isa<Constant>(R)) {
+								if (ii->getNumOperands() == 2 && isa<ConstantInt>(L) && isa<ConstantInt>(R)) {
 									Value *result = calcOpRes(op, cast<ConstantInt>(L), cast<ConstantInt>(R));
-									replaceAndErase(result, ii);
-									ops->constantFold++;
-									instchanged = true; funcchanged = true;
-									continue;
+									if (result) {
+
+										replaceAndErase(result, ii);
+										ops->constantFold++;
+										instchanged = true; funcchanged = true;
+										continue;
+									} else {
+										
+									}
 								}
 							}
 
@@ -219,11 +230,16 @@ namespace {
 						if (op == Instruction::Mul) {
 							if (ConstantInt *LC = dyn_cast<ConstantInt>(L)) {
 								APInt mulval = LC->getValue();
+
+								Instruction *RI = dyn_cast<Instruction>(R);
+
+								errs() << RI->getNumOperands() << "\n";
+								
+									
 								if (mulval.isPowerOf2()) {
 									unsigned lshift = mulval.logBase2();
+
 									BinaryOperator *newInst = BinaryOperator::Create(Instruction::Shl, R, ConstantInt::get(L->getType(), lshift));// isSigned is set to false
-									//ii->getParent()->getInstList().insertafter(ii, newInst);
-									//insert before ii
 									ii->getParent()->getInstList().insert(ii, newInst);
 
 									replaceAndErase(newInst, ii);
@@ -312,7 +328,6 @@ namespace {
 				errs() << "coming inside......................";
 				if (op == Instruction::Add) {
 					return ConstantInt::get(L->getContext(), L->getValue() + R->getValue());
-
 					//return ConstantExpr::getAdd(cast<ConstantInt>(I->getOperand(0)), cast<ConstantInt>(I->getOperand(1)));
 					//return ConstantInt::get(cast<IntegerType>(ii->getType()), L->getValue() + R->getValue());
 					//return cast<ConstantInt>(ConstantInt::get(L->getType(), L->getValue() + R->getValue()));
@@ -321,11 +336,20 @@ namespace {
 				} else if (op == Instruction::Mul) {
 					return ConstantInt::get(L->getContext(), L->getValue() * R->getValue());
 				} else if (op == Instruction::UDiv) {
-					return ConstantInt::get(L->getContext(), L->getValue().udiv(R->getValue()));
+					if (!R->isZero()) {
+						return ConstantInt::get(L->getContext(), L->getValue().udiv(R->getValue()));
+					} else {
+						return NULL;
+					}
 				} else if (op == Instruction::SDiv) {
-					return ConstantInt::get(L->getContext(), L->getValue().sdiv(R->getValue()));
+					if (!R->isZero()) {
+						return ConstantInt::get(L->getContext(), L->getValue().sdiv(R->getValue()));
+					} else {
+						return NULL;
+					}
 				} else {
 					errs() << "...........error....**********************";
+					return NULL;
 				}
 			}
 
