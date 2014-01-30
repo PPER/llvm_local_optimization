@@ -61,11 +61,16 @@ namespace {
 						}
 
 
-						errs() << "flag 1" << "\n";
+
+
+						//errs() << "flag 1" << "\n";
 
 						//while () {
 
 						//need to handle with store, because register too many cases
+						//
+						errs() << Instruction::Sext << "\n";
+
 						if (op == Instruction::Store) {
 							Value *varptr = dyn_cast<StoreInst>(ii)->getPointerOperand();
 							Value *value = dyn_cast<StoreInst>(ii)->getValueOperand();
@@ -354,7 +359,7 @@ namespace {
 
 
 
-					return ConstantExpr::getAdd(cast<ConstantInt>(I->getOperand(0)), cast<ConstantInt>(I->getOperand(1)));
+					//return ConstantExpr::getAdd(cast<ConstantInt>(I->getOperand(0)), cast<ConstantInt>(I->getOperand(1)));
 					//return ConstantInt::get(cast<IntegerType>(ii->getType()), L->getValue() + R->getValue());
 					//return cast<ConstantInt>(ConstantInt::get(L->getType(), L->getValue() + R->getValue()));
 				} else if (op == Instruction::Sub) {

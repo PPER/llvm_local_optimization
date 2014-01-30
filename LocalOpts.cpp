@@ -61,11 +61,16 @@ namespace {
 						}
 
 
-						errs() << "flag 1" << "\n";
+
+
+						//errs() << "flag 1" << "\n";
 
 						//while () {
 
 						//need to handle with store, because register too many cases
+						//
+						errs() << Instruction::Sext << "\n";
+
 						if (op == Instruction::Store) {
 							Value *varptr = dyn_cast<StoreInst>(ii)->getPointerOperand();
 							Value *value = dyn_cast<StoreInst>(ii)->getValueOperand();
