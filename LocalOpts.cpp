@@ -161,22 +161,16 @@ namespace {
 							//if (dyn_cast<Instruction>(L)->isIdenticalTo(dyn_cast<Instruction>(R))) {
 							//...........
 
-							if (L == R) {//...........and L != 0
-								//if (dyn_cast<Instruction>(L)->isIdenticalTo(dyn_cast<Instruction>(R))) {
-								//L is not a const........if (cast<ConstantInt>(L)->isIdenticalTo(cast<ConstantInt>(R))) {
-								//
-								//
-								//
-
-								//if L.type is Constant or Instruction??????
-
-
-								replaceAndErase(ConstantInt::get(L->getContext(), one), ii);
-								ops->algbraicIdent++;
-								instchanged = true; funcchanged = true;
-								continue;
-							} else if (ConstantInt *LC = dyn_cast<ConstantInt>(L)) {
+							if (ConstantInt *LC = dyn_cast<ConstantInt>(L)) {
 								if (LC->getValue() == zero) {
+									//........judge whether *RC is equal to zero?????????????????????????????????
+									//
+									if (ConstantInt *RC = dyn_cast<ConstantInt>(R)) {
+										if (RC->getValue() == zero) {
+											errs() << "Divided by Zero Error"<<"\n";
+										}
+									}
+
 									replaceAndErase(ConstantInt::get(LC->getContext(), zero), ii);
 									ops->algbraicIdent++;
 									instchanged = true; funcchanged = true;
@@ -189,6 +183,28 @@ namespace {
 									instchanged = true; funcchanged = true;
 									continue;
 								}
+							} else if (L == R) {//...........and L != 0
+								//if (dyn_cast<Instruction>(L)->isIdenticalTo(dyn_cast<Instruction>(R))) {
+								//L is not a const........if (cast<ConstantInt>(L)->isIdenticalTo(cast<ConstantInt>(R))) {
+								//
+								//
+								//
+
+								//if L.type is Constant or Instruction??????
+								
+								if (ConstantInt *RC = dyn_cast<ConstantInt>(R)) {
+										if (RC->getValue() == zero) {
+											errs() << "Divided by Zero Error"<<"\n";
+										}
+								}
+
+
+
+
+								replaceAndErase(ConstantInt::get(L->getContext(), one), ii);
+								ops->algbraicIdent++;
+								instchanged = true; funcchanged = true;
+								continue;
 							}
 						} else if (op == Instruction::Store) {
 							Value *varptr = dyn_cast<StoreInst>(ii)->getPointerOperand();
@@ -263,6 +279,7 @@ namespace {
 								}
 							}
 						} else if (op == Instruction::SDiv || op == Instruction::UDiv) {
+							/*
 							if (ConstantInt *LC = dyn_cast<ConstantInt>(L)) {
 								APInt divval = LC->getValue();
 								if (divval.isPowerOf2()) {
@@ -282,7 +299,7 @@ namespace {
 									instchanged = true; funcchanged = true;
 									continue;
 								} 
-							} else if (ConstantInt *RC = dyn_cast<ConstantInt>(R)) {
+							} else*/ if (ConstantInt *RC = dyn_cast<ConstantInt>(R)) {
 								APInt divval = RC->getValue();
 								if (divval.isPowerOf2()) {
 									unsigned rshift = divval.logBase2();

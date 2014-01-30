@@ -8,7 +8,7 @@ int compute (int a, int b)
   int result = (a/a);
   int x, y, z, loopi;
   long long int la, lb, lc;
-  double dx, dy, dz;
+  //double dx, dy, dz;
   unsigned long int ua, ub, uc;
   unsigned long long int ula, ulb, ulc;
 
@@ -59,6 +59,7 @@ int compute (int a, int b)
   printf("ula = %llu, ulb = %llu, ulc = %llu\n", ula, ulb, ulc);
  
   /* Case: double */
+/*
   dx = 1.0;
   dy = 1.0;
   dz = 2.0;
@@ -66,6 +67,7 @@ int compute (int a, int b)
   dx = dx + dz;
   dy = dy*dz;
   printf("dx = %lf, dy = %lf, dz = %lf\n", dx, dy, dx);
+*/
 
   result *= (b/b);
   result += (b-b);
