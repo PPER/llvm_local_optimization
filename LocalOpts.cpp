@@ -188,7 +188,6 @@ namespace {
 								//L is not a const........if (cast<ConstantInt>(L)->isIdenticalTo(cast<ConstantInt>(R))) {
 								//
 								//
-								//
 
 								//if L.type is Constant or Instruction??????
 								
@@ -197,9 +196,6 @@ namespace {
 											errs() << "Divided by Zero Error"<<"\n";
 										}
 								}
-
-
-
 
 								replaceAndErase(ConstantInt::get(L->getContext(), one), ii);
 								ops->algbraicIdent++;
@@ -322,6 +318,9 @@ namespace {
 						}
 
 
+//						if (ConstantInt 
+
+
 
 						if (!instchanged) {
 							++ii;
@@ -364,6 +363,12 @@ namespace {
 					} else {
 						return NULL;
 					}
+				} else if (op == Instruction::Shl) {
+					return ConstantInt::get(L->getContext(), L->getValue().shl(R->getValue()));
+				} else if (op == Instruction::AShr) {
+					return ConstantInt::get(L->getContext(), L->getValue().ashr(R->getValue()));
+				} else if (op == Instruction::LShr) {
+					return ConstantInt::get(L->getContext(), L->getValue().lshr(R->getValue()));
 				} else {
 					errs() << "...........error....**********************";
 					return NULL;
