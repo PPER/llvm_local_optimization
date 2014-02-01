@@ -1,7 +1,7 @@
 #include <stdio.h>
 int compute (int a, int b)
 {
-  int result = 0;
+  int result = 3;
   
   result += a * 2;
   result += a * 3;

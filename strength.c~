@@ -13,6 +13,6 @@ int compute (int a, int b)
 }
 
 int main() {
-	print("%d", compute(1, 8));
+	printf("%d", compute(1, 8));
 	return 0;
 }

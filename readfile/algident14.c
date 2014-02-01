@@ -1,5 +1,5 @@
-int compute(int x) {
-	int res;
-	res = x - 0;
-	return res;
+int compute(int x, int y) {
+	int a, b;
+	b = a + y;
+	return b;
 }

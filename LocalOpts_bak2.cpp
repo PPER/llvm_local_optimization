@@ -14,15 +14,12 @@
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
 
-#include "llvm/Support/PatternMatch.h"
-
 
 #include <ostream>
 #include <fstream>
 #include <iostream>
 
 using namespace llvm;
-using namespace llvm::PatternMatch;
 
 namespace {
 
@@ -33,7 +30,7 @@ namespace {
 			int strengthReduce;
 			int deleteUnused;
 			int consecutiveUnion;
-			OptSummary(): algbraicIdent(0), constantFold(0), strengthReduce(0), deleteUnused(0), consecutiveUnion(0) {}
+			OptSummary(): algbraicIdent(0), constantFold(0), strengthReduce(0) {}
 	};
 
 	class LocalOpts : public FunctionPass {
@@ -50,13 +47,6 @@ namespace {
 				++ii;
 				tmp->eraseFromParent();
 			}
-
-
-			/*
-			bool LocalOptimize() {
-
-			}
-			*/
 
 
 
@@ -258,70 +248,12 @@ namespace {
 								;
 							}
 
-
-							//...............Added some feature.............
-							if (op == Instruction::Add) {
-								// X + undef -> undef
-								if (match(R, m_Undef())) {
-									replaceAndErase(R, ii);
-									ops->algbraicIdent++;
-									instchanged = true; bbchanged = true; funcchanged = true;
-									continue;
-								}
-
-								if (match(L, m_Undef())) {
-									replaceAndErase(L, ii);
-									ops->algbraicIdent++;
-									instchanged = true; bbchanged = true; funcchanged = true;
-									continue;
-								}
-
-								// X + 0 -> X, not necessarily
-								//if (match(Op1, m_Zero())) {
-								//	replaceAndErase(Op0, ii);
-								//	ops->algbraicIdent++;
-								//	instchanged = true; bbchanged = true; funcchanged = true;
-								//	continue;
-								//}
-
-								// X + (Y - X) -> Y; (Y - X) + X -> Y
-								Value *Y = 0;
-								if (match(R, m_Sub(m_Value(Y), m_Specific(L))) || match(L, m_Sub(m_Value(Y), m_Specific(R)))) {
-									replaceAndErase(Y, ii);
-									ops->algbraicIdent++;
-									instchanged = true; bbchanged = true; funcchanged = true;
-									continue;
-								}
-							} else if (op == Instruction::Sub) {
-								// X - undef -> undef
-								// undef - X -> undef
-								if (match(L, m_Undef()) || match(R, m_Undef())) {
-									replaceAndErase(UndefValue::get(L->getType()), ii);
-									ops->algbraicIdent++;
-									instchanged = true; bbchanged = true; funcchanged = true;
-									continue;
-								}
-
-								// (X*2) - X -> X
-								//Value *X = 0;
-								if (match(L, m_Mul(m_Specific(R), m_ConstantInt<2>())) || match(L, m_Shl(m_Specific(R), m_One()))) {
-									replaceAndErase(R, ii);
-									ops->algbraicIdent++;
-									instchanged = true; bbchanged = true; funcchanged = true;
-									continue;
-								}
-
-							}
-
-
-
-
-
 							//Constant Folding
-							if (op == Instruction::Add || op == Instruction::Sub || op == Instruction::Mul || op == Instruction::SDiv || op == Instruction::UDiv || op == Instruction::Shl || op == Instruction::AShr || op == Instruction::LShr ) {
+							if (op == Instruction::Add || op == Instruction::Sub || op == Instruction::Mul || op == Instruction::SDiv || op == Instruction::UDiv) {
 								if (ii->getNumOperands() == 2 && isa<ConstantInt>(L) && isa<ConstantInt>(R)) {
 									Value *result = calcOpRes(op, cast<ConstantInt>(L), cast<ConstantInt>(R));
 									if (result) {
+
 										replaceAndErase(result, ii);
 										ops->constantFold++;
 										instchanged = true; bbchanged = true; funcchanged = true;
@@ -331,30 +263,6 @@ namespace {
 									}
 								}
 							}
-
-
-
-							
-							if (op == Instruction::Add ||op == Instruction::Mul) {
-								//need to be careful enough.....likely that L cannot be an instruction......then dyn_cast<Instruction> should return NULL....
-								//llvm::Instruction *LI = dyn_cast<Instruction>(L);
-								errs() << "wo yao mei zi" << "\n";
-								if (consecutiveJoin(op, L, R, ii)) { 
-									//ops->consecutiveUnion++;
-									ops->constantFold++;
-									instchanged = true; bbchanged = true; funcchanged = true;
-									continue;
-								} else if (consecutiveJoin(op, R, L, ii)) {
-									//ops->consecutiveUnion++;
-									ops->constantFold++;
-									instchanged = true; bbchanged = true; funcchanged = true;
-									continue;
-								}
-							}
-
-
-
-
 
 							//Strength Reductions
 							if (op == Instruction::Mul) {
@@ -393,7 +301,27 @@ namespace {
 									}
 								}
 							} else if (op == Instruction::SDiv || op == Instruction::UDiv) {
-								if (ConstantInt *RC = dyn_cast<ConstantInt>(R)) {
+								/*
+								   if (ConstantInt *LC = dyn_cast<ConstantInt>(L)) {
+								   APInt divval = LC->getValue();
+								   if (divval.isPowerOf2()) {
+								   unsigned rshift = divval.logBase2();
+								   BinaryOperator *newInst;
+								   if (op == Instruction::SDiv) {
+								   newInst = BinaryOperator::Create(Instruction::AShr, R, ConstantInt::get(L->getType(), rshift));// isSigned is set to false
+								   } else {
+								   newInst = BinaryOperator::Create(Instruction::LShr, R, ConstantInt::get(L->getType(), rshift));// isSigned is set to false
+								   }
+								//ii->getParent()->getInstList().insertafter(ii, newInst);
+								//insert before ii
+								ii->getParent()->getInstList().insert(ii, newInst);
+
+								replaceAndErase(newInst, ii);
+								ops->strengthReduce++;
+								instchanged = true; bbchanged = true; funcchanged = true;
+								continue;
+								} 
+								} else*/ if (ConstantInt *RC = dyn_cast<ConstantInt>(R)) {
 									APInt divval = RC->getValue();
 									if (divval.isPowerOf2()) {
 										unsigned rshift = divval.logBase2();
@@ -416,6 +344,26 @@ namespace {
 							}
 
 
+
+
+							/*
+							if (op == Instruction::Add ||op == Instruction::Mul) {
+								//need to be careful enough.....likely that L cannot be an instruction......then dyn_cast<Instruction> should return NULL....
+								//llvm::Instruction *LI = dyn_cast<Instruction>(L);
+								errs() << "wo yao mei zi" << "\n";
+								if (consecutiveJoin(op, L, R, ii)) { 
+									ops->consecutiveUnion++;
+									instchanged = true; bbchanged = true; funcchanged = true;
+									continue;
+								} else if (consecutiveJoin(op, R, L, ii)) {
+									ops->consecutiveUnion++;
+									instchanged = true; bbchanged = true; funcchanged = true;
+									continue;
+								}
+							}
+							*/ 
+
+
 							if (!instchanged) {
 								++ii;
 							} else {
@@ -428,17 +376,15 @@ namespace {
 					}
 				}
 
-				errs() << F.getName() << "\n";
 				errs() << "Summary of Optimizations\n";
 				errs() << "Algebraic Identities: " << ops->algbraicIdent << "\n";
 				errs() << "Constant Folding: " << ops->constantFold << "\n";
 				errs() << "Strength Reduction: " << ops->strengthReduce << "\n";
-				errs() << "Delete Unused: " << ops->deleteUnused << "\n\n";
 				return funcchanged;
 				}
 
-				bool consecutiveJoin(unsigned op, Value *L, Value *R, BasicBlock::iterator &ii) {
-					Instruction::BinaryOps Opcode = (Instruction::BinaryOps)op;
+				/*
+				bool consecutiveJoin(llvm::Instruction::BinaryOps op, Value *L, Value *R, BasicBlock::iterator &ii) {
 					if (!isa<Constant>(L) ) {
 						errs() << "wo yao mei zi2" << "\n";
 						if (llvm::Instruction *LI = dyn_cast<Instruction>(L)) {
@@ -446,8 +392,9 @@ namespace {
 							errs() << "wo yao mei zi3" << "\n";
 							if (ConstantInt *RV = dyn_cast<ConstantInt>(R)) {
 								errs() << "wo yao mei zi4" << "\n";
-								//unsigned op2 = LI->getOpcode();
-								if  (LI->getNumOperands() == 2 && LI->getOpcode() == Opcode) {
+								unsigned op2 = LI->getOpcode();
+								if  (LI->getNumOperands() == 2 && op2 == op) {
+
 									errs() << "wo yao mei zi5" << "\n";
 									Value *LL, *LR; 
 									LL = LI->getOperand(0);
@@ -457,7 +404,7 @@ namespace {
 										errs() << "wo yao mei zi6" << "\n";
 										if (ConstantInt *Res = calcOpRes(op, dyn_cast<ConstantInt>(LR), dyn_cast<ConstantInt>(R))) {
 											errs() << "wo yao mei zi7" << "\n";
-											BinaryOperator *newInst = BinaryOperator::Create(Opcode, LL, Res);
+											BinaryOperator *newInst = BinaryOperator::Create(Instruction::Mul, LL, Res);
 											//insert before ii
 											ii->getParent()->getInstList().insert(ii, newInst);
 
@@ -465,9 +412,9 @@ namespace {
 											return true;
 										}
 									} else if (ConstantInt *LLC = dyn_cast<ConstantInt>(LL)) {
-										if (ConstantInt *Res = calcOpRes(op, dyn_cast<ConstantInt>(LL), dyn_cast<ConstantInt>(R))) {
+										if (ConstantInt *Res = calcOpRes(Instruction::Mul, dyn_cast<ConstantInt>(LL), dyn_cast<ConstantInt>(R))) {
 											errs() << "wo yao mei zi8" << "\n";
-											BinaryOperator *newInst = BinaryOperator::Create(Opcode, LR, Res);
+											BinaryOperator *newInst = BinaryOperator::Create(Instruction::Mul, LR, Res);
 											//insert before ii
 											ii->getParent()->getInstList().insert(ii, newInst);
 
@@ -483,7 +430,7 @@ namespace {
 					}
 					return false;
 				}
-
+				*/
 
 
 
