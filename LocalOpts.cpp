@@ -58,6 +58,43 @@ namespace {
 			}
 			*/
 
+			Value *addHelper(Value *L, Value *R, int num, OptSummary *ops) {
+				if (ConstantInt LC = dyn_cast<ConstantInt>(L) && ConstantInt RC = dyn_cast<ConstantInt>(R)) {
+					Value *result = calcOpRes(op, LC, RC);
+					if (result) {
+						//replaceAndErase(result, ii);
+						ops.constantFold ++;
+						return result;
+					}	
+				}
+
+				// X + undef = undef + X = undef
+				if (match(R, m_Undef()) || match(R, m_Undef())) {
+					ops.algbraicIdent ++;
+					return UndefValue::get(L->getType());
+				}
+				// X + 0 = 0 + X = X
+				if (match(L, m_Zero()) || match(R, m_Zero())) {
+					ops.algbraicIdent ++;
+					return Constant::getNullValue(L->getType());
+				}
+				// X + (Y - X) = (Y - X) + X = Y
+				Value *Y = 0;
+				if (match(R, m_Sub(m_Value(Y), m_Specific(L))) || match(L, m_Sub(m_Value(X), m_Specific(R)))) {
+					ops.algbraicIdent ++;
+					return Y;
+				}
+
+
+
+			}
+
+			Value *subHelper(Value *L, Value *R, int num, OptSummary *ops) {
+				if (match(L, m_Undef()) || match(R, m_Undef())) {
+					return UndefValue::get(L->getType());
+
+			}
+
 
 
 			virtual bool runOnFunction(Function &F) {
