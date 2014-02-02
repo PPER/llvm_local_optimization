@@ -78,6 +78,13 @@ namespace {
 
 							unsigned op = ii->getOpcode();
 
+							APInt zero, one;
+							//32 bit or 64 bit integer?
+							if (IntegerType *inttype = dyn_cast<IntegerType>(ii->getType())) {
+								zero = APInt(inttype->getBitWidth(), 0);
+								one = APInt(inttype->getBitWidth(), 1);	
+							}
+
 				
 							if (op == Instruction::SExt) {
 								Value *S = ii->getOperand(0);
@@ -111,6 +118,121 @@ namespace {
 									continue;
 								}
 							}
+
+if (op == Instruction::Add) {
+								if (ConstantInt *LC = dyn_cast<ConstantInt>(L)) {
+									if (LC->getValue() == zero) {
+										replaceAndErase(R, ii);
+										ops->algbraicIdent++;
+										instchanged = true; bbchanged = true; funcchanged = true;
+										continue;
+									}
+								} else if (ConstantInt *RC = dyn_cast<ConstantInt>(R)) {
+									if (RC->getValue() == zero) {
+										replaceAndErase(L, ii);
+										ops->algbraicIdent++;
+										instchanged = true; bbchanged = true; funcchanged = true;
+										continue;
+									}
+								}
+							} else if (op == Instruction::Sub) {
+								//dyn_cast<Instruction>(L);
+
+								//if ((dyn_cast<Instruction>(L))->isIdenticalTo(dyn_cast<Instruction>(R))) {
+								//}
+								if (L == R) {
+									replaceAndErase(ConstantInt::get(L->getContext(), zero), ii);
+									ops->algbraicIdent++;
+									instchanged = true; bbchanged = true; funcchanged = true;
+									continue;
+								} else if (ConstantInt *RC = dyn_cast<ConstantInt>(R)) {
+									if (RC->getValue() == zero) {
+										replaceAndErase(L, ii);
+										ops->algbraicIdent++;
+										instchanged = true; bbchanged = true; funcchanged = true;
+										continue;
+									}
+									//change the following cast into dyn_cast???
+								} 
+							} else if (op == Instruction::Mul) {
+								if (ConstantInt *LC = dyn_cast<ConstantInt>(L)) {
+									if (LC->getValue() == zero) {
+										replaceAndErase(ConstantInt::get(LC->getContext(), zero), ii);
+										ops->algbraicIdent++;
+										instchanged = true; bbchanged = true; funcchanged = true;
+										continue;
+									} else if (LC->getValue() == one) {
+										replaceAndErase(R, ii);
+										ops->algbraicIdent++;
+										instchanged = true; bbchanged = true; funcchanged = true;
+										continue;
+									}
+								} else if (ConstantInt *RC = dyn_cast<ConstantInt>(R)) {
+									if (RC->getValue() == zero) {
+										replaceAndErase(ConstantInt::get(RC->getContext(), zero), ii);
+										ops->algbraicIdent++;
+										instchanged = true; bbchanged = true; funcchanged = true;
+										continue;
+									} else if (RC->getValue() == one) {
+										replaceAndErase(L, ii);
+										ops->algbraicIdent++;
+										instchanged = true; bbchanged = true; funcchanged = true;
+										continue;
+									}
+								}
+							} else if (op == Instruction::UDiv || op == Instruction::SDiv) {
+								//.............we need to judge whether R is 0.....
+								//if R is a variable, can we just add a assert R != 0??????????????????????
+								//............................assert..............................
+
+								//if (dyn_cast<Instruction>(L)->isIdenticalTo(dyn_cast<Instruction>(R))) {
+								//}
+								//...........
+
+								if (ConstantInt *LC = dyn_cast<ConstantInt>(L)) {
+									if (LC->getValue() == zero) {
+										//........judge whether *RC is equal to zero?????????????????????????????????
+										//
+										if (ConstantInt *RC = dyn_cast<ConstantInt>(R)) {
+											if (RC->getValue() == zero) {
+												errs() << "Divided by Zero Error"<<"\n";
+											}
+										}
+
+										replaceAndErase(ConstantInt::get(LC->getContext(), zero), ii);
+										ops->algbraicIdent++;
+										instchanged = true; bbchanged = true; funcchanged = true;
+										continue;
+									}	
+								} else if (ConstantInt *RC = dyn_cast<ConstantInt>(R)) {
+									if (RC->getValue() == one) {
+										replaceAndErase(L, ii);
+										ops->algbraicIdent++;
+										instchanged = true; bbchanged = true; funcchanged = true;
+										continue;
+									}
+								} else if (L == R) {//...........and L != 0
+									//if (dyn_cast<Instruction>(L)->isIdenticalTo(dyn_cast<Instruction>(R))) {
+									//L is not a const........if (cast<ConstantInt>(L)->isIdenticalTo(cast<ConstantInt>(R))) {
+									//}
+									//}
+									//
+
+									//if L.type is Constant or Instruction??????
+
+									if (ConstantInt *RC = dyn_cast<ConstantInt>(R)) {
+										if (RC->getValue() == zero) {
+											errs() << "Divided by Zero Error"<<"\n";
+										}
+									}
+
+									replaceAndErase(ConstantInt::get(L->getContext(), one), ii);
+									ops->algbraicIdent++;
+									instchanged = true; bbchanged = true; funcchanged = true;
+									continue;
+								}
+							}
+
 
 							if (op == Instruction::Add) {
 
@@ -378,8 +500,7 @@ namespace {
 					}
 				}
 			
-				errs() << F.getName() << "\n";
-				errs() << "Summary of Optimizations\n";
+				errs() << "Optimizations For Function " + F.getName() + ":\n";
 				errs() << "Algebraic Identities: " << ops->algbraicIdent << "\n";
 				errs() << "Constant Folding: " << ops->constantFold << "\n";
 				errs() << "Strength Reduction: " << ops->strengthReduce << "\n";
@@ -418,7 +539,7 @@ namespace {
 				Value *B = 0;
 				if (match(R, m_Sub(m_Value(B), m_Specific(L))) || match(L, m_Sub(m_Value(B), m_Specific(R)))) {
 					res = B;
-					ops->algbraicIdent ++;
+					ops->algbraicIdent++;
 					return true;
 				}
 				//Associate
@@ -430,7 +551,7 @@ namespace {
 							BinaryOperator *newInst = BinaryOperator::Create(Instruction::Add, M, C);
 							ii->getParent()->getInstList().insert(ii, newInst);
 							res = newInst;
-							ops->associate++;
+							ops->algbraicIdent ++;
 							return true;
 						}
 						if (addHelper(A, C, M, num-1, ops, ii)) {
