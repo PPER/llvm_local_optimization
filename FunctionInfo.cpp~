@@ -42,16 +42,16 @@ namespace {
 					++argNum;
 				}	
 				int instNum = 0;
-				/*
 				for (inst_iterator I = inst_begin(F), E = inst_end(F); I != E; ++I) {
 					//errs() << *I << "\n";
 					++instNum;
 				}
-				*/
 
+				/*
 				for (Function::iterator BB = F.begin(); BB != F.end(); ++BB) {
 					instNum += BB->size();
 				}
+				*/
 				int callsitesNum = 0;
 				for (Value::use_iterator U = F.use_begin(); U != F.use_end(); ++U) {
 					if (Instruction *use = dyn_cast<Instruction>(*U)) {

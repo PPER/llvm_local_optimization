@@ -264,6 +264,24 @@ if (op == Instruction::Add) {
 									instchanged = true; bbchanged = true; funcchanged = true;
 									continue;
 								}
+							} else if (op == Instruction::Shl) {
+								if (shlHelper(L, R, res, 3, ops, ii)) {
+									replaceAndErase(res, ii);
+									instchanged = true; bbchanged = true; funcchanged = true;
+									continue;
+								}
+							} else if (op == Instruction::LShr) {
+								if (lshrHelper(L, R, res, 3, ops, ii)) {
+									replaceAndErase(res, ii);
+									instchanged = true; bbchanged = true; funcchanged = true;
+									continue;
+								}
+							} else if (op == Instruction::AShr) {
+								if (ashrHelper(L, R, res, 3, ops, ii)) {
+									replaceAndErase(res, ii);
+									instchanged = true; bbchanged = true; funcchanged = true;
+									continue;
+								}
 							} else if (op == Instruction::Store) {
 								Value *varptr = dyn_cast<StoreInst>(ii)->getPointerOperand();
 								Value *value = dyn_cast<StoreInst>(ii)->getValueOperand();
@@ -500,7 +518,7 @@ if (op == Instruction::Add) {
 					}
 				}
 			
-				errs() << "Optimizations For Function " + F.getName() + ":\n";
+				errs() << "Optimizations For Function [" + F.getName() + "]:\n";
 				errs() << "Algebraic Identities: " << ops->algbraicIdent << "\n";
 				errs() << "Constant Folding: " << ops->constantFold << "\n";
 				errs() << "Strength Reduction: " << ops->strengthReduce << "\n";
@@ -1326,10 +1344,118 @@ if (op == Instruction::Add) {
 
 				}
 				return false;
-
-
-
 			}
+
+
+			bool shlHelper(Value *L, Value *R, Value *&res, int num, OptSummary *ops, BasicBlock::iterator &ii) {
+				if (!num) {
+					return false;
+				}
+				if (ConstantInt *LC = dyn_cast<ConstantInt>(L)) {
+					if (ConstantInt *RC = dyn_cast<ConstantInt>(R)) {
+						res = calcOpRes(Instruction::Shl, LC, RC);
+						if (res) {
+							ops->constantFold++;
+							return true;
+						}	
+						// else return false;??-> R = 0;
+					}
+				}
+				//A << 0 = A
+				if (match(R, m_Zero())) {
+					res = L;
+					ops->algbraicIdent++;
+					return true;
+				}
+				// (A << N) << R = A << (N+R);
+				{
+					Value *A = 0, *N = 0, *M;
+					if (match(L, m_Shl(m_Value(A), m_Value(N)))) {
+						if (addHelper(N, R, M, num-1, ops, ii)) {
+							BinaryOperator *newInst = BinaryOperator::Create(Instruction::Shl, A, M);
+							ii->getParent()->getInstList().insert(ii, newInst);
+							res = newInst;
+							ops->algbraicIdent++;
+							return true;
+						}
+					}
+				}
+				return false;
+			}
+
+			bool lshrHelper(Value *L, Value *R, Value *&res, int num, OptSummary *ops, BasicBlock::iterator &ii) {
+				if (!num) {
+					return false;
+				}
+				if (ConstantInt *LC = dyn_cast<ConstantInt>(L)) {
+					if (ConstantInt *RC = dyn_cast<ConstantInt>(R)) {
+						res = calcOpRes(Instruction::LShr, LC, RC);
+						if (res) {
+							ops->constantFold++;
+							return true;
+						}	
+						// else return false;??-> R = 0;
+					}
+				}
+				//A >> 0 = A
+				if (match(R, m_Zero())) {
+					res = L;
+					ops->algbraicIdent++;
+					return true;
+				}
+				// (A >> N) >> R = A >> (N+R);
+				{
+					Value *A = 0, *N = 0, *M;
+					if (match(L, m_LShr(m_Value(A), m_Value(N)))) {
+						if (addHelper(N, R, M, num-1, ops, ii)) {
+							BinaryOperator *newInst = BinaryOperator::Create(Instruction::LShr, A, M);
+							ii->getParent()->getInstList().insert(ii, newInst);
+							res = newInst;
+							ops->algbraicIdent++;
+							return true;
+						}
+					}
+				}
+				return false;
+			}
+
+
+			bool ashrHelper(Value *L, Value *R, Value *&res, int num, OptSummary *ops, BasicBlock::iterator &ii) {
+				if (!num) {
+					return false;
+				}
+				if (ConstantInt *LC = dyn_cast<ConstantInt>(L)) {
+					if (ConstantInt *RC = dyn_cast<ConstantInt>(R)) {
+						res = calcOpRes(Instruction::AShr, LC, RC);
+						if (res) {
+							ops->constantFold++;
+							return true;
+						}	
+						// else return false;??-> R = 0;
+					}
+				}
+				//A >> 0 = A
+				if (match(R, m_Zero())) {
+					res = L;
+					ops->algbraicIdent++;
+					return true;
+				}
+				// (A >> N) >> R = A >> (N+R);
+				{
+					Value *A = 0, *N = 0, *M;
+					if (match(L, m_AShr(m_Value(A), m_Value(N)))) {
+						if (addHelper(N, R, M, num-1, ops, ii)) {
+							BinaryOperator *newInst = BinaryOperator::Create(Instruction::AShr, A, M);
+							ii->getParent()->getInstList().insert(ii, newInst);
+							res = newInst;
+							ops->algbraicIdent++;
+							return true;
+						}
+					}
+				}
+				return false;
+			}
+
 
 
 
