@@ -23,7 +23,7 @@ int compute (int a, int b)
   /* Case: int */
   for (loopi = 0; loopi < b; loopi++ ) {
     x= LONG_MAX;
-    y = 0;
+    y = 1;
     z = 1;
     x = x + z;
     z = x/y;
