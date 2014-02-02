@@ -56,6 +56,337 @@ namespace {
 				}
 			}
 
+
+
+			virtual bool runOnFunction(Function &F) {
+				OptSummary *ops = new OptSummary();
+				bool funcchanged = false;
+
+				for (Function::iterator BB = F.begin(), Be = F.end(); BB != Be; ++BB) {
+					//for (BasicBlock::iterator ii = BB->begin(), ie = BB->end(); ii != ie; ++ii) {}
+					bool bbchanged = true;
+					while (bbchanged) {
+						bbchanged = false;
+						BasicBlock::iterator ii = BB->begin(), ie = BB->end();
+						while (ii != ie) {
+							bool instchanged = false;
+							Value *L, *R, *res;
+							if (ii->getNumOperands() == 2) {
+								L = ii->getOperand(0);
+								R = ii->getOperand(1);
+							}
+
+							unsigned op = ii->getOpcode();
+
+				
+							if (op == Instruction::SExt) {
+								Value *S = ii->getOperand(0);
+								if (ConstantInt *SC = dyn_cast<ConstantInt>(S)) {
+									//Constant -> Value
+									Value *conv = ConstantInt::get(ii->getType(), SC->getSExtValue());//, false);
+									replaceAndErase(conv, ii);
+									//ops->constantFold++;
+									instchanged = true; bbchanged = true; funcchanged = true;
+									continue;
+								}
+							} else if (op == Instruction::Trunc) {
+								Value *S = ii->getOperand(0);
+								if (ConstantInt *SC = dyn_cast<ConstantInt>(S)) {
+									//Value *conv = ConstantInt::get(ii->getType(), SC->getValue());
+									Value *conv = ConstantInt::get(ii->getType(), SC->getSExtValue());
+									replaceAndErase(conv, ii);
+									//ops->constantFold++;
+									instchanged = true; bbchanged = true; funcchanged = true;
+									continue;
+								}
+							}
+
+							if (op == Instruction::Add ||op == Instruction::Sub ||op == Instruction::Mul ||op == Instruction::SDiv ||op == Instruction::UDiv ||op == Instruction::Shl ||op == Instruction::AShr ||op == Instruction::LShr) {
+								//no one use this instruction...then we delete it.....
+								if (!ii->hasNUsesOrMore(1)) {
+									//hope this works.....&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+									replaceAndErase(NULL, ii);
+									ops->deleteUnused++;
+									instchanged = true; bbchanged = true; funcchanged = true;
+									continue;
+								}
+							}
+
+							if (op == Instruction::Add) {
+
+								if (addHelper(L, R, res, 3, ops, ii)) {
+									replaceAndErase(res, ii);
+									instchanged = true; bbchanged = true; funcchanged = true;
+									continue;
+								}
+							} else if (op == Instruction::Sub) {
+								if (subHelper(L, R, res, 3, ops, ii)) {
+									replaceAndErase(res, ii);
+									instchanged = true; bbchanged = true; funcchanged = true;
+									continue;
+								}
+							} else if (op == Instruction::Mul) {
+								if (mulHelper(L, R, res, 3, ops, ii)) {
+									replaceAndErase(res, ii);
+									instchanged = true; bbchanged = true; funcchanged = true;
+									continue;
+								}
+							} else if (op == Instruction::SDiv) {
+								if (sdivHelper(L, R, res, 3, ops, ii)) {
+									replaceAndErase(res, ii);
+									instchanged = true; bbchanged = true; funcchanged = true;
+									continue;
+								}
+							} else if (op == Instruction::UDiv) {
+								if (udivHelper(L, R, res, 3, ops, ii)) {
+									replaceAndErase(res, ii);
+									instchanged = true; bbchanged = true; funcchanged = true;
+									continue;
+								}
+							} else if (op == Instruction::Store) {
+								Value *varptr = dyn_cast<StoreInst>(ii)->getPointerOperand();
+								Value *value = dyn_cast<StoreInst>(ii)->getValueOperand();
+								if (isa<Constant>(*value)) {
+									for (Value::use_iterator u = varptr->use_begin(), ue = varptr->use_end(); u != ue; ++u) {
+										if (LoadInst *li = dyn_cast<LoadInst>(*u)) {
+											li->replaceAllUsesWith(value);
+											++ii;
+											//we need to add counter to marker......
+											//ops->algbraicIdent++;
+											instchanged = true;	bbchanged = true; funcchanged = true;
+											errs() << "flag***666" << "\n";
+											continue;
+										}
+									}
+								}
+							} else {
+								;
+							}
+
+
+
+							//Constant Folding
+							if (op == Instruction::Add || op == Instruction::Sub || op == Instruction::Mul || op == Instruction::SDiv || op == Instruction::UDiv || op == Instruction::Shl || op == Instruction::AShr || op == Instruction::LShr ) {
+								if (ii->getNumOperands() == 2 && isa<ConstantInt>(L) && isa<ConstantInt>(R)) {
+									Value *result = calcOpRes(op, cast<ConstantInt>(L), cast<ConstantInt>(R));
+									if (result) {
+										replaceAndErase(result, ii);
+										ops->constantFold++;
+										instchanged = true; bbchanged = true; funcchanged = true;
+										continue;
+									} else {
+
+									}
+								}
+							}
+
+
+							errs() << *ii << "\n";
+
+
+							
+							if (op == Instruction::Add ||op == Instruction::Mul) {
+								//need to be careful enough.....likely that L cannot be an instruction......then dyn_cast<Instruction> should return NULL....
+								//llvm::Instruction *LI = dyn_cast<Instruction>(L);
+								errs() << "wo yao mei zi" << "\n";
+								if (consecutiveJoin(op, L, R, ii)) { 
+									//ops->consecutiveUnion++;
+									ops->constantFold++;
+									instchanged = true; bbchanged = true; funcchanged = true;
+									continue;
+								} else if (consecutiveJoin(op, R, L, ii)) {
+									//ops->consecutiveUnion++;
+									ops->constantFold++;
+									instchanged = true; bbchanged = true; funcchanged = true;
+									continue;
+								}
+							}
+
+
+							/*
+							//Strength Reductions
+							if (op == Instruction::Mul) {
+								if (ConstantInt *LC = dyn_cast<ConstantInt>(L)) {
+									APInt mulval = LC->getValue();
+
+									Instruction *RI = dyn_cast<Instruction>(R);
+
+									errs() << RI->getNumOperands() << "\n";
+
+
+									if (mulval.isPowerOf2()) {
+										unsigned lshift = mulval.logBase2();
+
+										BinaryOperator *newInst = BinaryOperator::Create(Instruction::Shl, R, ConstantInt::get(L->getType(), lshift));// isSigned is set to false
+										ii->getParent()->getInstList().insert(ii, newInst);
+
+										replaceAndErase(newInst, ii);
+										ops->strengthReduce++;
+										instchanged = true; bbchanged = true; funcchanged = true;
+										continue;
+									} 
+								} else if (ConstantInt *RC = dyn_cast<ConstantInt>(R)) {
+									APInt mulval = RC->getValue();
+									if (mulval.isPowerOf2()) {
+										unsigned lshift = mulval.logBase2();
+										BinaryOperator *newInst = BinaryOperator::Create(Instruction::Shl, L, ConstantInt::get(R->getType(), lshift));// isSigned is set to false
+										//ii->getParent()->getInstList().insertafter(ii, newInst);
+										//insert before ii
+										ii->getParent()->getInstList().insert(ii, newInst);
+
+										replaceAndErase(newInst, ii);
+										ops->strengthReduce++;
+										instchanged = true; bbchanged = true; funcchanged = true;
+										continue;
+									}
+								}
+							} else if (op == Instruction::SDiv || op == Instruction::UDiv) {
+								if (ConstantInt *RC = dyn_cast<ConstantInt>(R)) {
+									APInt divval = RC->getValue();
+									if (divval.isPowerOf2()) {
+										unsigned rshift = divval.logBase2();
+										BinaryOperator *newInst;
+										if (op == Instruction::SDiv) {
+											newInst = BinaryOperator::Create(Instruction::AShr, L, ConstantInt::get(R->getType(), rshift));// isSigned is set to false
+										} else {
+											newInst = BinaryOperator::Create(Instruction::LShr, L, ConstantInt::get(R->getType(), rshift));// isSigned is set to false
+										}
+										//ii->getParent()->getInstList().insertafter(ii, newInst);
+										//insert before ii
+										ii->getParent()->getInstList().insert(ii, newInst);
+
+										replaceAndErase(newInst, ii);
+										ops->strengthReduce++;
+										instchanged = true; bbchanged = true; funcchanged = true;
+										continue;
+									}
+								}
+							}
+							*/
+
+
+							if (!instchanged) {
+								++ii;
+							} else {
+								//bbchanged = true; funcchanged = true; 
+							}
+
+						}
+
+
+					}
+
+
+					errs() << "hihihihihiihi\n";
+
+					bbchanged = true;
+					while (bbchanged) {
+						bbchanged = false;
+						BasicBlock::iterator ii = BB->begin(), ie = BB->end();
+						while (ii != ie) {
+							bool instchanged = false;
+							Value *L, *R, *res;
+							if (ii->getNumOperands() == 2) {
+								L = ii->getOperand(0);
+								R = ii->getOperand(1);
+							}
+
+							unsigned op = ii->getOpcode();
+
+							if (op == Instruction::Add ||op == Instruction::Sub ||op == Instruction::Mul ||op == Instruction::SDiv ||op == Instruction::UDiv ||op == Instruction::Shl ||op == Instruction::AShr ||op == Instruction::LShr) {
+								//no one use this instruction...then we delete it.....
+								if (!ii->hasNUsesOrMore(1)) {
+									//hope this works.....&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+									replaceAndErase(NULL, ii);
+									ops->deleteUnused++;
+									instchanged = true; bbchanged = true; funcchanged = true;
+									continue;
+								}
+							}
+
+							errs() << "***************************\n";
+
+							//Strength Reductions
+							if (op == Instruction::Mul) {
+								if (ConstantInt *LC = dyn_cast<ConstantInt>(L)) {
+									APInt mulval = LC->getValue();
+
+									//Instruction *RI = dyn_cast<Instruction>(R);
+									//errs() << RI->getNumOperands() << "\n";
+
+
+									if (mulval.isPowerOf2()) {
+										unsigned lshift = mulval.logBase2();
+
+										BinaryOperator *newInst = BinaryOperator::Create(Instruction::Shl, R, ConstantInt::get(L->getType(), lshift));// isSigned is set to false
+										ii->getParent()->getInstList().insert(ii, newInst);
+
+										replaceAndErase(newInst, ii);
+										ops->strengthReduce++;
+										instchanged = true; bbchanged = true; funcchanged = true;
+										continue;
+									} 
+								} else if (ConstantInt *RC = dyn_cast<ConstantInt>(R)) {
+									APInt mulval = RC->getValue();
+									if (mulval.isPowerOf2()) {
+										unsigned lshift = mulval.logBase2();
+										BinaryOperator *newInst = BinaryOperator::Create(Instruction::Shl, L, ConstantInt::get(R->getType(), lshift));// isSigned is set to false
+										//ii->getParent()->getInstList().insertafter(ii, newInst);
+										//insert before ii
+										ii->getParent()->getInstList().insert(ii, newInst);
+
+										replaceAndErase(newInst, ii);
+										ops->strengthReduce++;
+										instchanged = true; bbchanged = true; funcchanged = true;
+										continue;
+									}
+								}
+							} else if (op == Instruction::SDiv || op == Instruction::UDiv) {
+								if (ConstantInt *RC = dyn_cast<ConstantInt>(R)) {
+									APInt divval = RC->getValue();
+									if (divval.isPowerOf2()) {
+										unsigned rshift = divval.logBase2();
+										BinaryOperator *newInst;
+										if (op == Instruction::SDiv) {
+											newInst = BinaryOperator::Create(Instruction::AShr, L, ConstantInt::get(R->getType(), rshift));// isSigned is set to false
+										} else {
+											newInst = BinaryOperator::Create(Instruction::LShr, L, ConstantInt::get(R->getType(), rshift));// isSigned is set to false
+										}
+										//ii->getParent()->getInstList().insertafter(ii, newInst);
+										//insert before ii
+										ii->getParent()->getInstList().insert(ii, newInst);
+
+										replaceAndErase(newInst, ii);
+										ops->strengthReduce++;
+										instchanged = true; bbchanged = true; funcchanged = true;
+										continue;
+									}
+								}
+							}
+
+							errs() << "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n";
+
+
+							if (!instchanged) {
+								++ii;
+							} else {
+								//bbchanged = true; funcchanged = true; 
+							}
+
+
+						}
+					}
+				}
+			
+				errs() << F.getName() << "\n";
+				errs() << "Summary of Optimizations\n";
+				errs() << "Algebraic Identities: " << ops->algbraicIdent << "\n";
+				errs() << "Constant Folding: " << ops->constantFold << "\n";
+				errs() << "Strength Reduction: " << ops->strengthReduce << "\n";
+				errs() << "Delete Unused: " << ops->deleteUnused << "\n\n";
+				return funcchanged;
+			}
+
 			bool addHelper(Value *L, Value *R, Value *&res, int num, OptSummary *ops, BasicBlock::iterator &ii) {
 				if (!num) {
 					return false;
@@ -770,344 +1101,8 @@ namespace {
 
 
 
-			virtual bool runOnFunction(Function &F) {
-				OptSummary *ops = new OptSummary();
-				bool funcchanged = false;
-
-				for (Function::iterator BB = F.begin(), Be = F.end(); BB != Be; ++BB) {
-					//for (BasicBlock::iterator ii = BB->begin(), ie = BB->end(); ii != ie; ++ii) {}
-					bool bbchanged = true;
-					while (bbchanged) {
-						bbchanged = false;
-						BasicBlock::iterator ii = BB->begin(), ie = BB->end();
-						while (ii != ie) {
-							bool instchanged = false;
-							Value *L, *R, *res;
-							if (ii->getNumOperands() == 2) {
-								L = ii->getOperand(0);
-								R = ii->getOperand(1);
-							}
-
-							unsigned op = ii->getOpcode();
-
-				
-							if (op == Instruction::SExt) {
-								Value *S = ii->getOperand(0);
-								if (ConstantInt *SC = dyn_cast<ConstantInt>(S)) {
-									//Constant -> Value
-									Value *conv = ConstantInt::get(ii->getType(), SC->getSExtValue());//, false);
-									replaceAndErase(conv, ii);
-									//ops->constantFold++;
-									instchanged = true; bbchanged = true; funcchanged = true;
-									continue;
-								}
-							} else if (op == Instruction::Trunc) {
-								Value *S = ii->getOperand(0);
-								if (ConstantInt *SC = dyn_cast<ConstantInt>(S)) {
-									//Value *conv = ConstantInt::get(ii->getType(), SC->getValue());
-									Value *conv = ConstantInt::get(ii->getType(), SC->getSExtValue());
-									replaceAndErase(conv, ii);
-									//ops->constantFold++;
-									instchanged = true; bbchanged = true; funcchanged = true;
-									continue;
-								}
-							}
-
-							if (op == Instruction::Add ||op == Instruction::Sub ||op == Instruction::Mul ||op == Instruction::SDiv ||op == Instruction::UDiv ||op == Instruction::Shl ||op == Instruction::AShr ||op == Instruction::LShr) {
-								//no one use this instruction...then we delete it.....
-								if (!ii->hasNUsesOrMore(1)) {
-									//hope this works.....&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-									replaceAndErase(NULL, ii);
-									ops->deleteUnused++;
-									instchanged = true; bbchanged = true; funcchanged = true;
-									continue;
-								}
-							}
-
-							if (op == Instruction::Add) {
-
-								if (addHelper(L, R, res, 3, ops, ii)) {
-									replaceAndErase(res, ii);
-									Instruction *testadd = dyn_cast<Instruction>(res);
-									if (testadd) {
-										errs() << "add:" << testadd->getNumOperands() << "\n";
-									}
-									errs() << "1Algebraic Identities: " << ops->algbraicIdent << "\n";
-									errs() << "1Constant Folding: " << ops->constantFold << "\n";
-									errs() << "Strength Reduction: " << ops->strengthReduce << "\n";
-									errs() << "Delete Unused: " << ops->deleteUnused << "\n\n";
-									instchanged = true; bbchanged = true; funcchanged = true;
-									continue;
-								}
-							} else if (op == Instruction::Sub) {
-								if (subHelper(L, R, res, 3, ops, ii)) {
-									replaceAndErase(res, ii);
-									Instruction *testadd = dyn_cast<Instruction>(res);
-									if (testadd) {
-										errs() << "sub:" << testadd->getNumOperands() << "\n";
-									}
-									errs() << "2Algebraic Identities: " << ops->algbraicIdent << "\n";
-									errs() << "2Constant Folding: " << ops->constantFold << "\n";
-									errs() << "2Strength Reduction: " << ops->strengthReduce << "\n";
-									errs() << "2Delete Unused: " << ops->deleteUnused << "\n\n";
-									instchanged = true; bbchanged = true; funcchanged = true;
-									continue;
-								}
-							} else if (op == Instruction::Mul) {
-								if (mulHelper(L, R, res, 3, ops, ii)) {
-									replaceAndErase(res, ii);
-									errs() << "3Algebraic Identities: " << ops->algbraicIdent << "\n";
-									errs() << "3Constant Folding: " << ops->constantFold << "\n";
-									errs() << "3Strength Reduction: " << ops->strengthReduce << "\n";
-									errs() << "3Delete Unused: " << ops->deleteUnused << "\n\n";
-									instchanged = true; bbchanged = true; funcchanged = true;
-									continue;
-								}
-							} else if (op == Instruction::SDiv) {
-								if (sdivHelper(L, R, res, 3, ops, ii)) {
-									replaceAndErase(res, ii);
-									instchanged = true; bbchanged = true; funcchanged = true;
-									continue;
-								}
-							} else if (op == Instruction::UDiv) {
-								if (udivHelper(L, R, res, 3, ops, ii)) {
-									replaceAndErase(res, ii);
-									instchanged = true; bbchanged = true; funcchanged = true;
-									continue;
-								}
-							} else if (op == Instruction::Store) {
-								Value *varptr = dyn_cast<StoreInst>(ii)->getPointerOperand();
-								Value *value = dyn_cast<StoreInst>(ii)->getValueOperand();
-								if (isa<Constant>(*value)) {
-									for (Value::use_iterator u = varptr->use_begin(), ue = varptr->use_end(); u != ue; ++u) {
-										if (LoadInst *li = dyn_cast<LoadInst>(*u)) {
-											li->replaceAllUsesWith(value);
-											++ii;
-											//we need to add counter to marker......
-											//ops->algbraicIdent++;
-											instchanged = true;	bbchanged = true; funcchanged = true;
-											errs() << "flag***666" << "\n";
-											continue;
-										}
-									}
-								}
-							} else {
-								;
-							}
 
 
-
-							//Constant Folding
-							if (op == Instruction::Add || op == Instruction::Sub || op == Instruction::Mul || op == Instruction::SDiv || op == Instruction::UDiv || op == Instruction::Shl || op == Instruction::AShr || op == Instruction::LShr ) {
-								if (ii->getNumOperands() == 2 && isa<ConstantInt>(L) && isa<ConstantInt>(R)) {
-									Value *result = calcOpRes(op, cast<ConstantInt>(L), cast<ConstantInt>(R));
-									if (result) {
-										replaceAndErase(result, ii);
-										ops->constantFold++;
-										instchanged = true; bbchanged = true; funcchanged = true;
-										continue;
-									} else {
-
-									}
-								}
-							}
-
-
-							
-							if (op == Instruction::Add ||op == Instruction::Mul) {
-								//need to be careful enough.....likely that L cannot be an instruction......then dyn_cast<Instruction> should return NULL....
-								//llvm::Instruction *LI = dyn_cast<Instruction>(L);
-								errs() << "wo yao mei zi" << "\n";
-								if (consecutiveJoin(op, L, R, ii)) { 
-									//ops->consecutiveUnion++;
-									ops->constantFold++;
-									instchanged = true; bbchanged = true; funcchanged = true;
-									continue;
-								} else if (consecutiveJoin(op, R, L, ii)) {
-									//ops->consecutiveUnion++;
-									ops->constantFold++;
-									instchanged = true; bbchanged = true; funcchanged = true;
-									continue;
-								}
-							}
-
-
-							/*
-							//Strength Reductions
-							if (op == Instruction::Mul) {
-								if (ConstantInt *LC = dyn_cast<ConstantInt>(L)) {
-									APInt mulval = LC->getValue();
-
-									Instruction *RI = dyn_cast<Instruction>(R);
-
-									errs() << RI->getNumOperands() << "\n";
-
-
-									if (mulval.isPowerOf2()) {
-										unsigned lshift = mulval.logBase2();
-
-										BinaryOperator *newInst = BinaryOperator::Create(Instruction::Shl, R, ConstantInt::get(L->getType(), lshift));// isSigned is set to false
-										ii->getParent()->getInstList().insert(ii, newInst);
-
-										replaceAndErase(newInst, ii);
-										ops->strengthReduce++;
-										instchanged = true; bbchanged = true; funcchanged = true;
-										continue;
-									} 
-								} else if (ConstantInt *RC = dyn_cast<ConstantInt>(R)) {
-									APInt mulval = RC->getValue();
-									if (mulval.isPowerOf2()) {
-										unsigned lshift = mulval.logBase2();
-										BinaryOperator *newInst = BinaryOperator::Create(Instruction::Shl, L, ConstantInt::get(R->getType(), lshift));// isSigned is set to false
-										//ii->getParent()->getInstList().insertafter(ii, newInst);
-										//insert before ii
-										ii->getParent()->getInstList().insert(ii, newInst);
-
-										replaceAndErase(newInst, ii);
-										ops->strengthReduce++;
-										instchanged = true; bbchanged = true; funcchanged = true;
-										continue;
-									}
-								}
-							} else if (op == Instruction::SDiv || op == Instruction::UDiv) {
-								if (ConstantInt *RC = dyn_cast<ConstantInt>(R)) {
-									APInt divval = RC->getValue();
-									if (divval.isPowerOf2()) {
-										unsigned rshift = divval.logBase2();
-										BinaryOperator *newInst;
-										if (op == Instruction::SDiv) {
-											newInst = BinaryOperator::Create(Instruction::AShr, L, ConstantInt::get(R->getType(), rshift));// isSigned is set to false
-										} else {
-											newInst = BinaryOperator::Create(Instruction::LShr, L, ConstantInt::get(R->getType(), rshift));// isSigned is set to false
-										}
-										//ii->getParent()->getInstList().insertafter(ii, newInst);
-										//insert before ii
-										ii->getParent()->getInstList().insert(ii, newInst);
-
-										replaceAndErase(newInst, ii);
-										ops->strengthReduce++;
-										instchanged = true; bbchanged = true; funcchanged = true;
-										continue;
-									}
-								}
-							}
-							*/
-
-
-							if (!instchanged) {
-								++ii;
-							} else {
-								//bbchanged = true; funcchanged = true; 
-							}
-
-						}
-
-
-					}
-
-					bbchanged = true;
-					while (bbchanged) {
-						bbchanged = false;
-						BasicBlock::iterator ii = BB->begin(), ie = BB->end();
-						while (ii != ie) {
-							bool instchanged = false;
-							Value *L, *R, *res;
-							if (ii->getNumOperands() == 2) {
-								L = ii->getOperand(0);
-								R = ii->getOperand(1);
-							}
-
-							unsigned op = ii->getOpcode();
-
-							if (op == Instruction::Add ||op == Instruction::Sub ||op == Instruction::Mul ||op == Instruction::SDiv ||op == Instruction::UDiv ||op == Instruction::Shl ||op == Instruction::AShr ||op == Instruction::LShr) {
-								//no one use this instruction...then we delete it.....
-								if (!ii->hasNUsesOrMore(1)) {
-									//hope this works.....&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-									replaceAndErase(NULL, ii);
-									ops->deleteUnused++;
-									instchanged = true; bbchanged = true; funcchanged = true;
-									continue;
-								}
-							}
-							//Strength Reductions
-							if (op == Instruction::Mul) {
-								if (ConstantInt *LC = dyn_cast<ConstantInt>(L)) {
-									APInt mulval = LC->getValue();
-
-									Instruction *RI = dyn_cast<Instruction>(R);
-
-									errs() << RI->getNumOperands() << "\n";
-
-
-									if (mulval.isPowerOf2()) {
-										unsigned lshift = mulval.logBase2();
-
-										BinaryOperator *newInst = BinaryOperator::Create(Instruction::Shl, R, ConstantInt::get(L->getType(), lshift));// isSigned is set to false
-										ii->getParent()->getInstList().insert(ii, newInst);
-
-										replaceAndErase(newInst, ii);
-										ops->strengthReduce++;
-										instchanged = true; bbchanged = true; funcchanged = true;
-										continue;
-									} 
-								} else if (ConstantInt *RC = dyn_cast<ConstantInt>(R)) {
-									APInt mulval = RC->getValue();
-									if (mulval.isPowerOf2()) {
-										unsigned lshift = mulval.logBase2();
-										BinaryOperator *newInst = BinaryOperator::Create(Instruction::Shl, L, ConstantInt::get(R->getType(), lshift));// isSigned is set to false
-										//ii->getParent()->getInstList().insertafter(ii, newInst);
-										//insert before ii
-										ii->getParent()->getInstList().insert(ii, newInst);
-
-										replaceAndErase(newInst, ii);
-										ops->strengthReduce++;
-										instchanged = true; bbchanged = true; funcchanged = true;
-										continue;
-									}
-								}
-							} else if (op == Instruction::SDiv || op == Instruction::UDiv) {
-								if (ConstantInt *RC = dyn_cast<ConstantInt>(R)) {
-									APInt divval = RC->getValue();
-									if (divval.isPowerOf2()) {
-										unsigned rshift = divval.logBase2();
-										BinaryOperator *newInst;
-										if (op == Instruction::SDiv) {
-											newInst = BinaryOperator::Create(Instruction::AShr, L, ConstantInt::get(R->getType(), rshift));// isSigned is set to false
-										} else {
-											newInst = BinaryOperator::Create(Instruction::LShr, L, ConstantInt::get(R->getType(), rshift));// isSigned is set to false
-										}
-										//ii->getParent()->getInstList().insertafter(ii, newInst);
-										//insert before ii
-										ii->getParent()->getInstList().insert(ii, newInst);
-
-										replaceAndErase(newInst, ii);
-										ops->strengthReduce++;
-										instchanged = true; bbchanged = true; funcchanged = true;
-										continue;
-									}
-								}
-							}
-
-
-							if (!instchanged) {
-								++ii;
-							} else {
-								//bbchanged = true; funcchanged = true; 
-							}
-
-
-						}
-					}
-				}
-			
-				errs() << F.getName() << "\n";
-				errs() << "Summary of Optimizations\n";
-				errs() << "Algebraic Identities: " << ops->algbraicIdent << "\n";
-				errs() << "Constant Folding: " << ops->constantFold << "\n";
-				errs() << "Strength Reduction: " << ops->strengthReduce << "\n";
-				errs() << "Delete Unused: " << ops->deleteUnused << "\n\n";
-				return funcchanged;
-				}
 
 				bool consecutiveJoin(unsigned op, Value *L, Value *R, BasicBlock::iterator &ii) {
 					Instruction::BinaryOps Opcode = (Instruction::BinaryOps)op;
