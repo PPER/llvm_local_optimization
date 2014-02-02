@@ -553,6 +553,15 @@ if (op == Instruction::Add) {
 					ops->algbraicIdent ++;
 					return true;
 				}
+				
+				//A + A = A * 2
+				if (match(R, m_Specific(L))) {
+					BinaryOperator *newInst = BinaryOperator::Create(Instruction::Mul, L, ConstantInt::get(L->getType(), 2));
+					ii->getParent()->getInstList().insert(ii, newInst);
+					res = newInst;
+					ops->algbraicIdent++;
+					return true;
+				}
 
 
 				// A + A * N = A * (1+N)
