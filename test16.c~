@@ -1,5 +1,0 @@
-int compute(int a, int b) {
-	int res;
-	res = 3 * a - 3 * b;
-	return res;
-}

@@ -1,7 +1,0 @@
-int compute (a) {
-	int x, y, z;
-	x = a / 25;
-	y = x / 5;
-	return y;
-}
-

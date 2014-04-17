@@ -1,7 +1,0 @@
-int compute (int a)
-{
-	int result;
-	int b = 2;
-  result = a + b;
-  return result;
-}
